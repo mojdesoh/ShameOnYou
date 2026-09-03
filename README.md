@@ -85,8 +85,12 @@ Or open the project folder in Android Studio and run it from there.
 - **Reminder timing isn't exact.** `WorkManager` periodic scheduling can drift by a while
   under Doze/battery optimization — fine for a weekly nudge, but worth revisiting with
   exact alarms if tighter timing ever matters.
-- **No admin confirmation step for new members yet** — anyone with the invite code joins
-  immediately (the product spec mentioned this as a future version, not v1).
+- **No admin confirmation step for new members yet** — anyone with the group code joins
+  immediately. The product spec calls for the group creator to be notified when someone
+  joins (and, later, to approve them) — that notification isn't built yet, only the plain
+  join flow.
+- **The "Your name" field on Create/Join is temporary.** Once the app has a profile
+  screen, display names should come from there instead of being typed in on every group.
 - **A member can log progress more than once between reminders** — there's no enforcement
   of "once per week"; every submission just adds to their running total.
 - **No launcher icon** — the app uses the system default until a real one is designed.
@@ -95,3 +99,12 @@ Or open the project folder in Android Studio and run it from there.
   not, the "shame" message calls out whichever member is furthest from their target. This
   wasn't fully spelled out in the original spec — worth confirming this is the intended
   rule as more challenge types get added.
+
+## Group codes
+
+Group identity is a code the creator chooses (not a randomly generated invite code). It's
+prefilled from the group name as they type but fully editable, and it doubles as the
+group's Firestore document ID — so uniqueness is enforced atomically by a Firestore
+transaction at creation time (claim-or-fail on the same document, no separate check step).
+Codes are normalized to uppercase letters, digits, and hyphens (e.g. "Fat Rats!" →
+`FAT-RATS`) so they're also safe to use in the `groupchallenge://join?code=` deep link.

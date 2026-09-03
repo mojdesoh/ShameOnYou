@@ -30,8 +30,8 @@ fun JoinGroupScreen(
     prefilledCode: String?,
     onJoined: (groupId: String) -> Unit
 ) {
-    var inviteCode by remember { mutableStateOf(prefilledCode ?: "") }
     var yourName by remember { mutableStateOf("") }
+    var groupCode by remember { mutableStateOf(prefilledCode ?: "") }
     var isSubmitting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -40,16 +40,16 @@ fun JoinGroupScreen(
         Text("Join a group", style = MaterialTheme.typography.headlineSmall)
 
         OutlinedTextField(
-            value = inviteCode,
-            onValueChange = { inviteCode = it },
-            label = { Text("Invite code") },
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
-        )
-        OutlinedTextField(
             value = yourName,
             onValueChange = { yourName = it },
             label = { Text("Your name") },
+            modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+        )
+        OutlinedTextField(
+            value = groupCode,
+            onValueChange = { groupCode = it },
+            label = { Text("Group unique code") },
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
         )
 
@@ -63,9 +63,9 @@ fun JoinGroupScreen(
                 isSubmitting = true
                 scope.launch {
                     try {
-                        val group = repository.joinGroup(inviteCode.trim(), yourName.trim())
+                        val group = repository.joinGroup(groupCode.trim(), yourName.trim())
                         when {
-                            group == null -> error = "No group found for that invite code."
+                            group == null -> error = "No group found for that code."
                             group.locked -> error = "This group is already locked and isn't accepting new members."
                             else -> {
                                 prefs.groupId = group.id
@@ -80,7 +80,7 @@ fun JoinGroupScreen(
                     }
                 }
             },
-            enabled = !isSubmitting && inviteCode.isNotBlank() && yourName.isNotBlank(),
+            enabled = !isSubmitting && groupCode.isNotBlank() && yourName.isNotBlank(),
             modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
         ) {
             if (isSubmitting) {

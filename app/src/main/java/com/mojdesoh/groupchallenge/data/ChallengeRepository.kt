@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import java.util.TimeZone
-import kotlin.random.Random
 
 /**
  * All reads/writes go through Firestore's free Spark-plan quota directly from the client —
@@ -31,43 +30,44 @@ class ChallengeRepository {
         return result.user!!.uid
     }
 
-    private fun randomInviteCode(): String {
-        val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        return (1..6).map { chars[Random.nextInt(chars.length)] }.joinToString("")
-    }
-
-    suspend fun createGroup(name: String, adminDisplayName: String): Group {
+    /**
+     * The group's unique code doubles as its Firestore document ID, so a transaction can
+     * atomically check-and-claim it — two people racing to create the same code can't both
+     * succeed.
+     */
+    suspend fun createGroup(name: String, adminDisplayName: String, code: String): Group {
         val uid = currentUserId()
-        val doc = groupsRef().document()
+        val normalizedCode = normalizeGroupCode(code)
+        val docRef = groupsRef().document(normalizedCode)
         val group = Group(
-            id = doc.id,
+            id = normalizedCode,
             name = name,
-            inviteCode = randomInviteCode(),
+            inviteCode = normalizedCode,
             adminId = uid,
             adminDisplayName = adminDisplayName,
             locked = false,
             createdAtMillis = System.currentTimeMillis(),
             adminTimeZoneId = TimeZone.getDefault().id
         )
-        doc.set(group).await()
-        membersRef(doc.id).document(uid)
+        db.runTransaction { transaction ->
+            if (transaction.get(docRef).exists()) throw GroupCodeTakenException()
+            transaction.set(docRef, group)
+        }.await()
+        membersRef(normalizedCode).document(uid)
             .set(Member(uid, adminDisplayName, System.currentTimeMillis()))
             .await()
         return group
     }
 
-    /** Returns null if no group has that invite code. */
-    suspend fun joinGroup(inviteCode: String, displayName: String): Group? {
+    /** Returns null if no group has that code. */
+    suspend fun joinGroup(code: String, displayName: String): Group? {
         val uid = currentUserId()
-        val snapshot = groupsRef()
-            .whereEqualTo("inviteCode", inviteCode.trim().uppercase())
-            .limit(1)
-            .get()
-            .await()
-        val doc = snapshot.documents.firstOrNull() ?: return null
-        val group = doc.toObject(Group::class.java) ?: return null
+        val normalizedCode = normalizeGroupCode(code)
+        val snapshot = groupsRef().document(normalizedCode).get().await()
+        if (!snapshot.exists()) return null
+        val group = snapshot.toObject(Group::class.java) ?: return null
         if (group.locked) return group
-        membersRef(group.id).document(uid)
+        membersRef(normalizedCode).document(uid)
             .set(Member(uid, displayName, System.currentTimeMillis()))
             .await()
         return group

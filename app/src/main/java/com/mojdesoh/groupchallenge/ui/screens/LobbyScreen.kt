@@ -61,11 +61,11 @@ fun LobbyScreen(
 
         group?.let { g ->
             Spacer(Modifier.height(16.dp))
-            Text("Invite code: ${g.inviteCode}", style = MaterialTheme.typography.titleMedium)
+            Text("Group code: ${g.inviteCode}", style = MaterialTheme.typography.titleMedium)
             OutlinedButton(
                 onClick = {
                     val shareText = "Join my group \"${g.name}\" on Group Challenge.\n" +
-                        "Invite code: ${g.inviteCode}\n" +
+                        "Group code: ${g.inviteCode}\n" +
                         "Or tap this link if you already have the app: groupchallenge://join?code=${g.inviteCode}"
                     val intent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"

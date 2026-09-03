@@ -31,7 +31,7 @@ fun WelcomeScreen(onCreateGroup: () -> Unit, onJoinGroup: () -> Unit) {
         )
         Spacer(Modifier.height(32.dp))
         Button(onClick = onCreateGroup, modifier = Modifier.fillMaxWidth()) {
-            Text("Create a group")
+            Text("Create your group")
         }
         Spacer(Modifier.height(12.dp))
         OutlinedButton(onClick = onJoinGroup, modifier = Modifier.fillMaxWidth()) {
