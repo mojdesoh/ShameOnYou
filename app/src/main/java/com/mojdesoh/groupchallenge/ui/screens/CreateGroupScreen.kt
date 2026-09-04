@@ -93,7 +93,6 @@ fun CreateGroupScreen(
                 scope.launch {
                     try {
                         val group = repository.createGroup(groupName.trim(), yourName.trim(), normalizedCode)
-                        prefs.groupId = group.id
                         prefs.displayName = yourName.trim()
                         onCreated(group.id)
                     } catch (e: GroupCodeTakenException) {

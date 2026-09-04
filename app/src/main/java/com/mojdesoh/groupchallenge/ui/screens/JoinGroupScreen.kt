@@ -68,7 +68,6 @@ fun JoinGroupScreen(
                             group == null -> error = "No group found for that code."
                             group.locked -> error = "This group is already locked and isn't accepting new members."
                             else -> {
-                                prefs.groupId = group.id
                                 prefs.displayName = yourName.trim()
                                 onJoined(group.id)
                             }

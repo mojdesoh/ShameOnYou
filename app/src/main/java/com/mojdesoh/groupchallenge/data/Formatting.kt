@@ -1,5 +1,14 @@
 package com.mojdesoh.groupchallenge.data
 
+enum class GroupStatus { NOT_LOCKED, ACTIVE, ENDED }
+
+/** Where a group is in its lifecycle, used both for the Home screen label and for routing. */
+fun Group.status(): GroupStatus {
+    if (!locked) return GroupStatus.NOT_LOCKED
+    val c = challenge ?: return GroupStatus.ACTIVE
+    return if (System.currentTimeMillis() >= c.endAtMillis) GroupStatus.ENDED else GroupStatus.ACTIVE
+}
+
 fun Challenge.periodLabel(): String {
     val unitWord = scopeUnit.label + if (scopeValue == 1) "" else "s"
     return "$scopeValue $unitWord"

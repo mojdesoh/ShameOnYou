@@ -44,10 +44,13 @@ file stays local to your machine — you won't need to redo this after a `git pu
 ### Firestore security rules
 
 The default "production mode" rules deny all reads/writes. For this app's data model
-(collection `groups`, with subcollections `members` and `entries`), a starting point that
-matches what the client actually needs — anyone signed in can read a group and its
-subcollections, only the admin can lock it or set the challenge, and each member can only
-write their own member/entry doc:
+(collection `groups`, with subcollections `members` and `entries`, plus a top-level `users`
+collection that indexes which groups each user belongs to — see "Home screen and multiple
+challenges" below), a starting point that matches what the client actually needs — anyone
+signed in can read a group and its subcollections, only the admin can lock it, set the
+challenge, or delete it (which also lets the admin delete other members' member/entry docs
+as part of that cascade), each member can otherwise only write their own member/entry doc,
+and each user can only read/write their own membership index:
 
 ```
 rules_version = '2';
@@ -56,16 +59,24 @@ service cloud.firestore {
     match /groups/{groupId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update: if request.auth != null && resource.data.adminId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
 
       match /members/{userId} {
         allow read: if request.auth != null;
         allow write: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.adminId == request.auth.uid;
       }
       match /entries/{userId} {
         allow read: if request.auth != null;
         allow write: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.adminId == request.auth.uid;
       }
+    }
+
+    match /users/{userId}/groups/{groupId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
@@ -79,6 +90,28 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Or open the project folder in Android Studio and run it from there.
+
+## Home screen and multiple challenges
+
+A user can belong to any number of challenges at once (as admin of some, a member of
+others). The Home screen lists all of them, newest on top, and is the app's permanent hub —
+every other screen is pushed on top of it and returns to it on back. Since there's no
+backend, "which groups does this user belong to" is answered by a small per-user index in
+Firestore: `users/{uid}/groups/{groupId}`, one doc per membership, written alongside the
+existing `groups/{groupId}/members/{uid}` doc whenever someone creates or joins a group. The
+Home screen just reads that index for the signed-in user and fetches each referenced group.
+
+- Tapping a card opens it at whatever stage it's in: the Lobby if not locked yet, live
+  Progress if active, or the Result screen if the challenge period has ended.
+- Edit and Delete only show for challenges where the current user is admin. Edit is only
+  enabled before the group is locked (it opens the Lobby, today's pre-lock management
+  screen); Delete works at any stage, with a confirmation dialog, and removes the group for
+  every member.
+- Deleting cascades: the group doc, every member doc, and every entry doc are removed in one
+  batch, along with the admin's own membership index entry. Other members' index entries
+  would otherwise go stale (Firestore doesn't cascade-delete across a different user's data
+  from a client-only app); each is cleaned up lazily the next time that member's Home screen
+  notices the group it points to no longer exists.
 
 ## Known v1 limitations
 

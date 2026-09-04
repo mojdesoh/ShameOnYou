@@ -8,6 +8,7 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.TimeZone
 
@@ -23,6 +24,14 @@ class ChallengeRepository {
     private fun groupsRef() = db.collection("groups")
     private fun membersRef(groupId: String) = groupsRef().document(groupId).collection("members")
     private fun entriesRef(groupId: String) = groupsRef().document(groupId).collection("entries")
+
+    /**
+     * Per-user index of which groups they belong to (`users/{uid}/groups/{groupId}`), so the
+     * Home screen can list every challenge a user is in without a Firestore collection-group
+     * query. Written whenever a user creates or joins a group; a stale entry (group deleted by
+     * its admin) is cleaned up lazily the next time [observeMyGroups] notices it's gone.
+     */
+    private fun myGroupsRef(userId: String) = db.collection("users").document(userId).collection("groups")
 
     suspend fun currentUserId(): String {
         auth.currentUser?.let { return it.uid }
@@ -56,6 +65,9 @@ class ChallengeRepository {
         membersRef(normalizedCode).document(uid)
             .set(Member(uid, adminDisplayName, System.currentTimeMillis()))
             .await()
+        myGroupsRef(uid).document(normalizedCode)
+            .set(mapOf("joinedAtMillis" to group.createdAtMillis))
+            .await()
         return group
     }
 
@@ -67,10 +79,50 @@ class ChallengeRepository {
         if (!snapshot.exists()) return null
         val group = snapshot.toObject(Group::class.java) ?: return null
         if (group.locked) return group
+        val joinedAtMillis = System.currentTimeMillis()
         membersRef(normalizedCode).document(uid)
-            .set(Member(uid, displayName, System.currentTimeMillis()))
+            .set(Member(uid, displayName, joinedAtMillis))
+            .await()
+        myGroupsRef(uid).document(normalizedCode)
+            .set(mapOf("joinedAtMillis" to joinedAtMillis))
             .await()
         return group
+    }
+
+    /**
+     * Every group the current user belongs to (as admin or member), newest membership first.
+     * Fetches each group document fresh whenever the membership index changes; a membership
+     * pointing at a group that no longer exists (deleted by its admin) is removed as it's found.
+     */
+    fun observeMyGroups(userId: String): Flow<List<Group>> = callbackFlow {
+        val scope = this
+        val registration = myGroupsRef(userId)
+            .orderBy("joinedAtMillis", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, _ ->
+                val groupIds = snapshot?.documents?.map { it.id } ?: emptyList()
+                scope.launch {
+                    val groups = groupIds.mapNotNull { id ->
+                        val group = groupsRef().document(id).get().await().toObject(Group::class.java)
+                        if (group == null) myGroupsRef(userId).document(id).delete()
+                        group
+                    }
+                    trySend(groups)
+                }
+            }
+        awaitClose { registration.remove() }
+    }
+
+    /** Admin-only: deletes a group and all its members/entries for everyone. */
+    suspend fun deleteGroup(groupId: String) {
+        val uid = currentUserId()
+        val members = getMembersOnce(groupId)
+        val entries = getEntriesOnce(groupId)
+        val batch = db.batch()
+        members.forEach { batch.delete(membersRef(groupId).document(it.userId)) }
+        entries.forEach { batch.delete(entriesRef(groupId).document(it.userId)) }
+        batch.delete(groupsRef().document(groupId))
+        batch.delete(myGroupsRef(uid).document(groupId))
+        batch.commit().await()
     }
 
     suspend fun lockGroupAndSetChallenge(groupId: String, challenge: Challenge) {
