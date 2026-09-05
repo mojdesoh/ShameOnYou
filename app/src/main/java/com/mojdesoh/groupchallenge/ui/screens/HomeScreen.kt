@@ -47,12 +47,12 @@ fun HomeScreen(
     onGroupDeleted: (groupId: String) -> Unit
 ) {
     var currentUserId by remember { mutableStateOf<String?>(null) }
-    var signInError by remember { mutableStateOf<String?>(null) }
+    var connectionError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         try {
             currentUserId = repository.currentUserId()
         } catch (t: Throwable) {
-            signInError = "Couldn't sign in. Check your connection and Firebase setup, then reopen the app."
+            connectionError = "Couldn't connect to Firebase. Check your connection and app/google-services.json setup, then reopen the app."
         }
     }
 
@@ -75,13 +75,13 @@ fun HomeScreen(
                 TextButton(onClick = onJoinGroup) { Text("Join a group") }
             }
 
-            if (signInError != null || (userId != null && groups.isEmpty())) {
+            if (connectionError != null || (userId != null && groups.isEmpty())) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    signInError?.let {
+                    connectionError?.let {
                         Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                     } ?: run {
                         Text("No challenges yet", style = MaterialTheme.typography.titleMedium)

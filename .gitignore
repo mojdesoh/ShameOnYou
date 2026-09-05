@@ -12,3 +12,7 @@ captures/
 # Real Firebase config — each developer/environment provides their own.
 # A placeholder ships in its place so the project builds out of the box.
 app/google-services.json
+
+# Release signing key — generated once locally, never shared or regenerated
+# (a new keystore can't sign updates for an already-installed release APK).
+keystore/
