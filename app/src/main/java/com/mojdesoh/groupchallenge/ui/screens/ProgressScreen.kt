@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -34,6 +35,7 @@ import com.mojdesoh.groupchallenge.data.periodLabel
 fun ProgressScreen(
     groupId: String,
     repository: ChallengeRepository,
+    onBack: () -> Unit,
     onLogProgress: () -> Unit,
     onViewResult: () -> Unit
 ) {
@@ -48,9 +50,14 @@ fun ProgressScreen(
 
     val challenge = group?.challenge
 
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(24.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BackButton(onBack)
+            if (challenge == null) {
+                Text("Loading…", style = MaterialTheme.typography.headlineSmall)
+            }
+        }
         if (challenge == null) {
-            Text("Loading…", style = MaterialTheme.typography.headlineSmall)
             return@Column
         }
 

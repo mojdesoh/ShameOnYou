@@ -70,6 +70,7 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
             CreateGroupScreen(
                 repository = repository,
                 prefs = prefs,
+                onBack = { navController.popBackStack() },
                 onCreated = { groupId ->
                     navController.navigate("lobby/$groupId") { popUpTo("home") }
                 }
@@ -80,6 +81,7 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                 repository = repository,
                 prefs = prefs,
                 prefilledCode = (pendingNav as? PendingNav.JoinWithCode)?.code,
+                onBack = { navController.popBackStack() },
                 onJoined = { groupId ->
                     navController.navigate("lobby/$groupId") { popUpTo("home") }
                 }
@@ -94,6 +96,7 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                 groupId = groupId,
                 repository = repository,
                 prefs = prefs,
+                onBack = { navController.popBackStack() },
                 onLockAndSetChallenge = { navController.navigate("createChallenge/$groupId") },
                 onChallengeActive = {
                     navController.navigate("progress/$groupId") { popUpTo("home") }
@@ -108,6 +111,7 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
             CreateChallengeScreen(
                 groupId = groupId,
                 repository = repository,
+                onBack = { navController.popBackStack() },
                 onChallengeStarted = {
                     navController.navigate("progress/$groupId") { popUpTo("home") }
                 }
@@ -121,6 +125,7 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
             ProgressScreen(
                 groupId = groupId,
                 repository = repository,
+                onBack = { navController.popBackStack() },
                 onLogProgress = { navController.navigate("entry/$groupId") },
                 onViewResult = { navController.navigate("result/$groupId") }
             )
@@ -134,6 +139,7 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                 groupId = groupId,
                 repository = repository,
                 prefs = prefs,
+                onBack = { navController.popBackStack() },
                 onSubmitted = { navController.popBackStack() }
             )
         }
@@ -142,7 +148,11 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
             arguments = listOf(navArgument("groupId") { type = NavType.StringType })
         ) { backStackEntry ->
             val groupId = backStackEntry.arguments!!.getString("groupId")!!
-            ResultScreen(groupId = groupId, repository = repository)
+            ResultScreen(
+                groupId = groupId,
+                repository = repository,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

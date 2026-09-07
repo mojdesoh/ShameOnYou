@@ -1,9 +1,11 @@
 package com.mojdesoh.groupchallenge.ui.screens
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -16,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -28,6 +31,7 @@ fun JoinGroupScreen(
     repository: ChallengeRepository,
     prefs: LocalPrefs,
     prefilledCode: String?,
+    onBack: () -> Unit,
     onJoined: (groupId: String) -> Unit
 ) {
     var yourName by remember { mutableStateOf("") }
@@ -36,8 +40,11 @@ fun JoinGroupScreen(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text("Join a group", style = MaterialTheme.typography.headlineSmall)
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(24.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BackButton(onBack)
+            Text("Join a group", style = MaterialTheme.typography.headlineSmall)
+        }
 
         OutlinedTextField(
             value = yourName,

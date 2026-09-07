@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -25,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.mojdesoh.groupchallenge.data.Challenge
@@ -39,6 +41,7 @@ import kotlinx.coroutines.launch
 fun CreateChallengeScreen(
     groupId: String,
     repository: ChallengeRepository,
+    onBack: () -> Unit,
     onChallengeStarted: () -> Unit
 ) {
     val context = LocalContext.current
@@ -54,8 +57,11 @@ fun CreateChallengeScreen(
     var isSubmitting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text("Set the challenge", style = MaterialTheme.typography.headlineSmall)
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(24.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BackButton(onBack)
+            Text("Set the challenge", style = MaterialTheme.typography.headlineSmall)
+        }
 
         OutlinedTextField(
             value = title,
