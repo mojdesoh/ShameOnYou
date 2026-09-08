@@ -1,6 +1,13 @@
 package com.mojdesoh.groupchallenge.data
 
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 enum class GroupStatus { NOT_LOCKED, ACTIVE, ENDED }
+
+fun Long.toDateLabel(): String =
+    SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(this))
 
 /** Where a group is in its lifecycle, used both for the Home screen label and for routing. */
 fun Group.status(): GroupStatus {

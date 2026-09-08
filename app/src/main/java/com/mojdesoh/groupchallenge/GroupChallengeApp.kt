@@ -13,6 +13,7 @@ import com.mojdesoh.groupchallenge.data.ChallengeRepository
 import com.mojdesoh.groupchallenge.data.GroupStatus
 import com.mojdesoh.groupchallenge.data.LocalPrefs
 import com.mojdesoh.groupchallenge.data.status
+import com.mojdesoh.groupchallenge.ui.screens.ChallengeDetailsScreen
 import com.mojdesoh.groupchallenge.ui.screens.CreateChallengeScreen
 import com.mojdesoh.groupchallenge.ui.screens.CreateGroupScreen
 import com.mojdesoh.groupchallenge.ui.screens.EntryScreen
@@ -57,8 +58,7 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                 onOpenGroup = { group ->
                     val destination = when (group.status()) {
                         GroupStatus.NOT_LOCKED -> "lobby/${group.id}"
-                        GroupStatus.ACTIVE -> "progress/${group.id}"
-                        GroupStatus.ENDED -> "result/${group.id}"
+                        GroupStatus.ACTIVE, GroupStatus.ENDED -> "details/${group.id}"
                     }
                     navController.navigate(destination)
                 },
@@ -99,7 +99,7 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                 onBack = { navController.popBackStack() },
                 onLockAndSetChallenge = { navController.navigate("createChallenge/$groupId") },
                 onChallengeActive = {
-                    navController.navigate("progress/$groupId") { popUpTo("home") }
+                    navController.navigate("details/$groupId") { popUpTo("home") }
                 }
             )
         }
@@ -113,8 +113,21 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                 repository = repository,
                 onBack = { navController.popBackStack() },
                 onChallengeStarted = {
-                    navController.navigate("progress/$groupId") { popUpTo("home") }
+                    navController.navigate("details/$groupId") { popUpTo("home") }
                 }
+            )
+        }
+        composable(
+            "details/{groupId}",
+            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val groupId = backStackEntry.arguments!!.getString("groupId")!!
+            ChallengeDetailsScreen(
+                groupId = groupId,
+                repository = repository,
+                onBack = { navController.popBackStack() },
+                onViewProgress = { navController.navigate("progress/$groupId") },
+                onViewResult = { navController.navigate("result/$groupId") }
             )
         }
         composable(
