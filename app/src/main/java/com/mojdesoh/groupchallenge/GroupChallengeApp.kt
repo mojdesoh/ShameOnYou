@@ -16,6 +16,7 @@ import com.mojdesoh.groupchallenge.data.status
 import com.mojdesoh.groupchallenge.ui.screens.ChallengeDetailsScreen
 import com.mojdesoh.groupchallenge.ui.screens.CreateChallengeScreen
 import com.mojdesoh.groupchallenge.ui.screens.CreateGroupScreen
+import com.mojdesoh.groupchallenge.ui.screens.EditChallengeScreen
 import com.mojdesoh.groupchallenge.ui.screens.EntryScreen
 import com.mojdesoh.groupchallenge.ui.screens.HomeScreen
 import com.mojdesoh.groupchallenge.ui.screens.JoinGroupScreen
@@ -62,8 +63,15 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                     }
                     navController.navigate(destination)
                 },
-                onEditGroup = { group -> navController.navigate("lobby/${group.id}") },
-                onGroupDeleted = { groupId -> ReminderScheduler.cancelAll(context, groupId) }
+                onEditGroup = { group ->
+                    when (group.status()) {
+                        GroupStatus.NOT_LOCKED -> navController.navigate("lobby/${group.id}")
+                        GroupStatus.ACTIVE -> navController.navigate("editChallenge/${group.id}")
+                        GroupStatus.ENDED -> Unit
+                    }
+                },
+                onGroupDeleted = { groupId -> ReminderScheduler.cancelAll(context, groupId) },
+                onGroupArchived = { groupId -> ReminderScheduler.cancelAll(context, groupId) }
             )
         }
         composable("createGroup") {
@@ -128,6 +136,17 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                 onBack = { navController.popBackStack() },
                 onViewProgress = { navController.navigate("progress/$groupId") },
                 onViewResult = { navController.navigate("result/$groupId") }
+            )
+        }
+        composable(
+            "editChallenge/{groupId}",
+            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val groupId = backStackEntry.arguments!!.getString("groupId")!!
+            EditChallengeScreen(
+                groupId = groupId,
+                repository = repository,
+                onBack = { navController.popBackStack() }
             )
         }
         composable(

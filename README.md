@@ -45,12 +45,14 @@ file stays local to your machine — you won't need to redo this after a `git pu
 
 The default "production mode" rules deny all reads/writes. For this app's data model
 (collection `groups`, with subcollections `members` and `entries`, plus a top-level `users`
-collection that indexes which groups each user belongs to — see "Home screen and multiple
-challenges" below), a starting point that matches what the client actually needs — anyone
-signed in can read a group and its subcollections, only the admin can lock it, set the
-challenge, or delete it (which also lets the admin delete other members' member/entry docs
-as part of that cascade), each member can otherwise only write their own member/entry doc,
-and each user can only read/write their own membership index:
+collection that indexes which groups each user belongs to and holds each user's pending
+removal notices — see "Home screen and multiple challenges" below), a starting point that
+matches what the client actually needs — anyone signed in can read a group and its
+subcollections, only the admin can lock it, rename it, archive it, set the challenge, or
+delete it (which also lets the admin delete other members' member/entry docs, drop a removed
+member's own membership-index entry, and leave that member a removal notice), each member
+can otherwise only write their own member/entry doc, and each user can only read/write their
+own membership index and their own removal notices:
 
 ```
 rules_version = '2';
@@ -77,6 +79,14 @@ service cloud.firestore {
 
     match /users/{userId}/groups/{groupId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.adminId == request.auth.uid;
+    }
+
+    match /users/{userId}/removalNotices/{groupId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.adminId == request.auth.uid;
     }
   }
 }
@@ -101,17 +111,29 @@ Firestore: `users/{uid}/groups/{groupId}`, one doc per membership, written along
 existing `groups/{groupId}/members/{uid}` doc whenever someone creates or joins a group. The
 Home screen just reads that index for the signed-in user and fetches each referenced group.
 
-- Tapping a card opens it at whatever stage it's in: the Lobby if not locked yet, live
-  Progress if active, or the Result screen if the challenge period has ended.
-- Edit and Delete only show for challenges where the current user is admin. Edit is only
-  enabled before the group is locked (it opens the Lobby, today's pre-lock management
-  screen); Delete works at any stage, with a confirmation dialog, and removes the group for
-  every member.
-- Deleting cascades: the group doc, every member doc, and every entry doc are removed in one
-  batch, along with the admin's own membership index entry. Other members' index entries
-  would otherwise go stale (Firestore doesn't cascade-delete across a different user's data
-  from a client-only app); each is cleaned up lazily the next time that member's Home screen
-  notices the group it points to no longer exists.
+- Tapping a card opens it at whatever stage it's in: the Lobby if not locked yet, or a
+  Details screen (name, code, your own display name, member list, dates, and status) once
+  it's locked — Details links onward to live Progress or the final Result.
+- Edit, Delete, and Archive only show for challenges where the current user is admin.
+  - Edit is disabled once a challenge has ended. Before locking it opens the Lobby
+    (today's pre-lock management screen); once locked and ongoing it opens a dedicated Edit
+    Challenge screen where the admin can rename the challenge (the unique code/document ID
+    never changes) and remove members. A name change is a plain field update — every
+    member's UI picks it up live via the existing group listener, with no separate
+    notification. Removing a member deletes their member/entry docs, drops the group from
+    their own membership index, and leaves them a [`RemovalNotice`](#firestore-security-rules)
+    they'll see next time they open the app (Home shows it as a dialog naming the challenge
+    and the admin, and deletes the notice on dismissal so it's shown exactly once).
+  - Delete works at any stage, with a confirmation dialog, and removes the group for every
+    member. It cascades: the group doc, every member doc, and every entry doc are removed in
+    one batch, along with the admin's own membership index entry. Other members' index
+    entries would otherwise go stale (Firestore doesn't cascade-delete across a different
+    user's data from a client-only app); each is cleaned up lazily the next time that
+    member's Home screen notices the group it points to no longer exists.
+  - Archive (ongoing or ended challenges only) asks "Are you sure to archive this
+    challenge?" before setting `archived = true` on the group; archived challenges are
+    filtered out of the Home list (still in Firestore, just not shown — no dedicated
+    archived-challenges view yet) and their reminders are cancelled.
 
 ## Known v1 limitations
 

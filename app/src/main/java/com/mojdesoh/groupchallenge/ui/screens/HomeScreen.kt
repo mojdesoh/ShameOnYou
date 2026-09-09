@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.mojdesoh.groupchallenge.data.ChallengeRepository
 import com.mojdesoh.groupchallenge.data.Group
 import com.mojdesoh.groupchallenge.data.GroupStatus
+import com.mojdesoh.groupchallenge.data.RemovalNotice
 import com.mojdesoh.groupchallenge.data.status
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
@@ -45,24 +46,38 @@ fun HomeScreen(
     onJoinGroup: () -> Unit,
     onOpenGroup: (Group) -> Unit,
     onEditGroup: (Group) -> Unit,
-    onGroupDeleted: (groupId: String) -> Unit
+    onGroupDeleted: (groupId: String) -> Unit,
+    onGroupArchived: (groupId: String) -> Unit
 ) {
     var currentUserId by remember { mutableStateOf<String?>(null) }
     var connectionError by remember { mutableStateOf<String?>(null) }
+    var removalNotices by remember { mutableStateOf<List<RemovalNotice>>(emptyList()) }
     LaunchedEffect(Unit) {
-        try {
-            currentUserId = repository.currentUserId()
+        val uid = try {
+            repository.currentUserId()
         } catch (t: Throwable) {
             connectionError = "Couldn't connect to Firebase. Check your connection and app/google-services.json setup, then reopen the app."
+            return@LaunchedEffect
+        }
+        currentUserId = uid
+        // A failure here shouldn't block the rest of Home — removal notices are a nice-to-have,
+        // not required to see or manage your challenges.
+        removalNotices = try {
+            repository.getRemovalNotices(uid)
+        } catch (t: Throwable) {
+            emptyList()
         }
     }
 
     val userId = currentUserId
     val groups by (if (userId != null) repository.observeMyGroups(userId) else emptyFlow())
         .collectAsState(initial = emptyList())
+    val visibleGroups = groups.filter { !it.archived }
 
     var pendingDelete by remember { mutableStateOf<Group?>(null) }
     var isDeleting by remember { mutableStateOf(false) }
+    var pendingArchive by remember { mutableStateOf<Group?>(null) }
+    var isArchiving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
@@ -76,7 +91,7 @@ fun HomeScreen(
                 TextButton(onClick = onJoinGroup) { Text("Join a group") }
             }
 
-            if (connectionError != null || (userId != null && groups.isEmpty())) {
+            if (connectionError != null || (userId != null && visibleGroups.isEmpty())) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.Center,
@@ -99,13 +114,14 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
-                    items(groups, key = { it.id }) { group ->
+                    items(visibleGroups, key = { it.id }) { group ->
                         ChallengeCard(
                             group = group,
                             isAdmin = group.adminId == userId,
                             onOpen = { onOpenGroup(group) },
                             onEdit = { onEditGroup(group) },
-                            onDelete = { pendingDelete = group }
+                            onDelete = { pendingDelete = group },
+                            onArchive = { pendingArchive = group }
                         )
                     }
                 }
@@ -147,6 +163,50 @@ fun HomeScreen(
             }
         )
     }
+
+    pendingArchive?.let { group ->
+        AlertDialog(
+            onDismissRequest = { if (!isArchiving) pendingArchive = null },
+            title = { Text("Are you sure to archive this challenge?") },
+            confirmButton = {
+                TextButton(
+                    enabled = !isArchiving,
+                    onClick = {
+                        isArchiving = true
+                        scope.launch {
+                            try {
+                                repository.archiveGroup(group.id, true)
+                                onGroupArchived(group.id)
+                            } finally {
+                                isArchiving = false
+                                pendingArchive = null
+                            }
+                        }
+                    }
+                ) { Text("I am sure") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingArchive = null }, enabled = !isArchiving) { Text("No, discard") }
+            }
+        )
+    }
+
+    removalNotices.firstOrNull()?.let { notice ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Removed from \"${notice.groupName}\"") },
+            text = {
+                Text("You have been removed from the challenge \"${notice.groupName}\" by ${notice.removedByName}.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val uid = userId ?: return@TextButton
+                    removalNotices = removalNotices.drop(1)
+                    scope.launch { repository.dismissRemovalNotice(uid, notice.groupId) }
+                }) { Text("Close") }
+            }
+        )
+    }
 }
 
 @Composable
@@ -155,7 +215,8 @@ private fun ChallengeCard(
     isAdmin: Boolean,
     onOpen: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onArchive: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
         Row(
@@ -167,8 +228,11 @@ private fun ChallengeCard(
                 Text(statusLabel(group), style = MaterialTheme.typography.bodyMedium)
             }
             if (isAdmin) {
-                TextButton(onClick = onEdit, enabled = group.status() == GroupStatus.NOT_LOCKED) {
+                TextButton(onClick = onEdit, enabled = group.status() != GroupStatus.ENDED) {
                     Text("Edit")
+                }
+                if (group.status() != GroupStatus.NOT_LOCKED) {
+                    TextButton(onClick = onArchive) { Text("Archive") }
                 }
                 TextButton(onClick = onDelete) { Text("Delete") }
             }

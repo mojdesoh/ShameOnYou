@@ -33,6 +33,10 @@ class ChallengeRepository {
      */
     private fun myGroupsRef(userId: String) = db.collection("users").document(userId).collection("groups")
 
+    /** Per-user inbox of pending "you were removed" notices — see [RemovalNotice]. */
+    private fun removalNoticesRef(userId: String) =
+        db.collection("users").document(userId).collection("removalNotices")
+
     suspend fun currentUserId(): String {
         auth.currentUser?.let { return it.uid }
         val result = auth.signInAnonymously().await()
@@ -129,6 +133,43 @@ class ChallengeRepository {
         groupsRef().document(groupId)
             .set(mapOf("locked" to true, "challenge" to challenge), SetOptions.merge())
             .await()
+    }
+
+    /** Admin-only. The unique code (Firestore document ID) can't change, only the display name. */
+    suspend fun updateGroupName(groupId: String, newName: String) {
+        groupsRef().document(groupId).update("name", newName).await()
+    }
+
+    suspend fun archiveGroup(groupId: String, archived: Boolean) {
+        groupsRef().document(groupId).update("archived", archived).await()
+    }
+
+    /**
+     * Admin-only: removes a member and their entry from the group, drops the group from their
+     * own membership index, and leaves them a one-time [RemovalNotice] to see next time they
+     * open the app.
+     */
+    suspend fun removeMember(groupId: String, memberUserId: String, groupName: String, adminDisplayName: String) {
+        val notice = RemovalNotice(
+            groupId = groupId,
+            groupName = groupName,
+            removedByName = adminDisplayName,
+            removedAtMillis = System.currentTimeMillis()
+        )
+        val batch = db.batch()
+        batch.delete(membersRef(groupId).document(memberUserId))
+        batch.delete(entriesRef(groupId).document(memberUserId))
+        batch.delete(myGroupsRef(memberUserId).document(groupId))
+        batch.set(removalNoticesRef(memberUserId).document(groupId), notice)
+        batch.commit().await()
+    }
+
+    suspend fun getRemovalNotices(userId: String): List<RemovalNotice> =
+        removalNoticesRef(userId).get().await().documents.mapNotNull { it.toObject(RemovalNotice::class.java) }
+
+    /** Dismissing a notice deletes it, so it's never shown again. */
+    suspend fun dismissRemovalNotice(userId: String, groupId: String) {
+        removalNoticesRef(userId).document(groupId).delete().await()
     }
 
     suspend fun submitEntry(groupId: String, userId: String, displayName: String, value: Double) {
