@@ -14,9 +14,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -139,7 +145,7 @@ fun HomeScreen(
     pendingDelete?.let { group ->
         AlertDialog(
             onDismissRequest = { if (!isDeleting) pendingDelete = null },
-            title = { Text("Delete \"${group.name}\"?") },
+            title = { Text("Are you sure you want to delete ${group.name} challenge?") },
             text = { Text("This removes the challenge for everyone in the group. This can't be undone.") },
             confirmButton = {
                 TextButton(
@@ -228,13 +234,17 @@ private fun ChallengeCard(
                 Text(statusLabel(group), style = MaterialTheme.typography.bodyMedium)
             }
             if (isAdmin) {
-                TextButton(onClick = onEdit, enabled = group.status() != GroupStatus.ENDED) {
-                    Text("Edit")
+                IconButton(onClick = onEdit, enabled = group.status() != GroupStatus.ENDED) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit")
                 }
                 if (group.status() != GroupStatus.NOT_LOCKED) {
-                    TextButton(onClick = onArchive) { Text("Archive") }
+                    IconButton(onClick = onArchive) {
+                        Icon(Icons.Default.Archive, contentDescription = "Archive")
+                    }
                 }
-                TextButton(onClick = onDelete) { Text("Delete") }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete")
+                }
             }
         }
     }

@@ -71,6 +71,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose:1.9.2")
     // Forces a modern androidx.fragment version — a transitive dependency otherwise resolves
     // to 1.1.0, which fails a lint check tied to the ActivityResult APIs used in MainActivity,
