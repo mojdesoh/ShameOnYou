@@ -84,6 +84,8 @@ fun HomeScreen(
     var isDeleting by remember { mutableStateOf(false) }
     var pendingArchive by remember { mutableStateOf<Group?>(null) }
     var isArchiving by remember { mutableStateOf(false) }
+    var pendingLeave by remember { mutableStateOf<Group?>(null) }
+    var isLeaving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
@@ -121,13 +123,16 @@ fun HomeScreen(
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
                     items(visibleGroups, key = { it.id }) { group ->
+                        val isAdmin = group.adminId == userId
                         ChallengeCard(
                             group = group,
-                            isAdmin = group.adminId == userId,
+                            isAdmin = isAdmin,
                             onOpen = { onOpenGroup(group) },
                             onEdit = { onEditGroup(group) },
-                            onDelete = { pendingDelete = group },
-                            onArchive = { pendingArchive = group }
+                            onArchive = { pendingArchive = group },
+                            onDeleteOrLeave = {
+                                if (isAdmin) pendingDelete = group else pendingLeave = group
+                            }
                         )
                     }
                 }
@@ -197,6 +202,32 @@ fun HomeScreen(
         )
     }
 
+    pendingLeave?.let { group ->
+        AlertDialog(
+            onDismissRequest = { if (!isLeaving) pendingLeave = null },
+            title = { Text("Are you sure to leave the challenge?") },
+            confirmButton = {
+                TextButton(
+                    enabled = !isLeaving,
+                    onClick = {
+                        isLeaving = true
+                        scope.launch {
+                            try {
+                                repository.leaveGroup(group.id)
+                            } finally {
+                                isLeaving = false
+                                pendingLeave = null
+                            }
+                        }
+                    }
+                ) { Text("Yes, leave") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingLeave = null }, enabled = !isLeaving) { Text("No") }
+            }
+        )
+    }
+
     removalNotices.firstOrNull()?.let { notice ->
         AlertDialog(
             onDismissRequest = {},
@@ -221,8 +252,8 @@ private fun ChallengeCard(
     isAdmin: Boolean,
     onOpen: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onArchive: () -> Unit
+    onArchive: () -> Unit,
+    onDeleteOrLeave: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
         Row(
@@ -233,18 +264,14 @@ private fun ChallengeCard(
                 Text(group.name, style = MaterialTheme.typography.titleMedium)
                 Text(statusLabel(group), style = MaterialTheme.typography.bodyMedium)
             }
-            if (isAdmin) {
-                IconButton(onClick = onEdit, enabled = group.status() != GroupStatus.ENDED) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit")
-                }
-                if (group.status() != GroupStatus.NOT_LOCKED) {
-                    IconButton(onClick = onArchive) {
-                        Icon(Icons.Default.Archive, contentDescription = "Archive")
-                    }
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete")
-                }
+            IconButton(onClick = onEdit, enabled = isAdmin && group.status() != GroupStatus.ENDED) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit")
+            }
+            IconButton(onClick = onArchive, enabled = isAdmin) {
+                Icon(Icons.Default.Archive, contentDescription = "Archive")
+            }
+            IconButton(onClick = onDeleteOrLeave) {
+                Icon(Icons.Default.Delete, contentDescription = if (isAdmin) "Delete" else "Leave")
             }
         }
     }

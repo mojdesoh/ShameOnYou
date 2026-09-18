@@ -23,7 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.mojdesoh.groupchallenge.data.ChallengeRepository
+import com.mojdesoh.groupchallenge.data.GroupStatus
 import com.mojdesoh.groupchallenge.data.LocalPrefs
+import com.mojdesoh.groupchallenge.data.status
 import kotlinx.coroutines.launch
 
 @Composable
@@ -73,7 +75,8 @@ fun JoinGroupScreen(
                         val group = repository.joinGroup(groupCode.trim(), yourName.trim())
                         when {
                             group == null -> error = "No group found for that code."
-                            group.locked -> error = "This group is already locked and isn't accepting new members."
+                            group.status() == GroupStatus.ENDED ->
+                                error = "This challenge has already ended and isn't accepting new members."
                             else -> {
                                 prefs.displayName = yourName.trim()
                                 onJoined(group.id)

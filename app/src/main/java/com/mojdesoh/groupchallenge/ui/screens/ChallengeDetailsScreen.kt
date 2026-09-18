@@ -1,5 +1,8 @@
 package com.mojdesoh.groupchallenge.ui.screens
 
+import android.graphics.Bitmap
+import android.graphics.Color as AndroidColor
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,9 +28,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import com.mojdesoh.groupchallenge.data.ChallengeRepository
-import com.mojdesoh.groupchallenge.data.ChallengeResultEvaluator
+import com.mojdesoh.groupchallenge.data.GroupStatus
+import com.mojdesoh.groupchallenge.data.status
 import com.mojdesoh.groupchallenge.data.toDateLabel
 
 @Composable
@@ -39,7 +47,6 @@ fun ChallengeDetailsScreen(
 ) {
     val group by repository.observeGroup(groupId).collectAsState(initial = null)
     val members by repository.observeMembers(groupId).collectAsState(initial = emptyList())
-    val entries by repository.observeEntries(groupId).collectAsState(initial = emptyList())
     var currentUserId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -59,19 +66,21 @@ fun ChallengeDetailsScreen(
             return@Column
         }
 
-        val myName = members.firstOrNull { it.userId == currentUserId }?.displayName
-        val finished = System.currentTimeMillis() >= challenge.endAtMillis
-        val statusLabel = if (!finished) {
-            "Ongoing"
-        } else {
-            val result = ChallengeResultEvaluator.evaluate(challenge, members, entries)
-            if (result.groupSucceeded) "Success" else "Failure"
+        val isAdmin = currentUserId != null && currentUserId == g.adminId
+        val finished = g.status() == GroupStatus.ENDED
+        val statusLabel = when {
+            g.archived -> "Archived"
+            g.status() == GroupStatus.NOT_LOCKED -> "Not started"
+            g.status() == GroupStatus.ACTIVE -> "In progress"
+            else -> "Finished"
         }
 
         Spacer(Modifier.height(20.dp))
         DetailRow("Unique code", g.inviteCode)
-        DetailRow("My name", myName ?: "—")
-        DetailRow("Created", challenge.startAtMillis.toDateLabel())
+        if (isAdmin) {
+            DetailRow("Creation date", g.createdAtMillis.toDateLabel())
+        }
+        DetailRow("Start date", challenge.startAtMillis.toDateLabel())
         DetailRow("End date", challenge.endAtMillis.toDateLabel())
         DetailRow("Status", statusLabel)
 
@@ -100,7 +109,48 @@ fun ChallengeDetailsScreen(
         ) {
             Text(if (finished) "View full results" else "View progress")
         }
+
+        if (!finished) {
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "Scan to join this challenge",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                InviteQrCode(
+                    inviteUri = "groupchallenge://join?code=${g.inviteCode}",
+                    modifier = Modifier.size(200.dp)
+                )
+            }
+        }
     }
+}
+
+/** A QR code encoding the app's join deep link — scanning it with any camera app opens
+ * this app straight to the pre-filled Join screen, the same as tapping a shared invite link. */
+@Composable
+private fun InviteQrCode(inviteUri: String, modifier: Modifier = Modifier) {
+    val bitmap = remember(inviteUri) { generateQrBitmap(inviteUri, 512) }
+    Image(
+        bitmap = bitmap.asImageBitmap(),
+        contentDescription = "QR code to join this challenge",
+        modifier = modifier
+    )
+}
+
+private fun generateQrBitmap(content: String, sizePx: Int): Bitmap {
+    val bitMatrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, sizePx, sizePx)
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.RGB_565)
+    for (x in 0 until sizePx) {
+        for (y in 0 until sizePx) {
+            bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) AndroidColor.BLACK else AndroidColor.WHITE)
+        }
+    }
+    return bitmap
 }
 
 @Composable

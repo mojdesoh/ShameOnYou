@@ -42,7 +42,7 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
 
     LaunchedEffect(pendingNav) {
         when (val nav = pendingNav) {
-            is PendingNav.JoinWithCode -> navController.navigate("joinGroup")
+            is PendingNav.JoinWithCode -> navController.navigate("joinGroup?code=${nav.code}")
             is PendingNav.OpenEntry -> navController.navigate("entry/${nav.groupId}")
             is PendingNav.OpenResult -> navController.navigate("result/${nav.groupId}")
             null -> Unit
@@ -84,11 +84,14 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                 }
             )
         }
-        composable("joinGroup") {
+        composable(
+            "joinGroup?code={code}",
+            arguments = listOf(navArgument("code") { type = NavType.StringType; nullable = true; defaultValue = null })
+        ) { backStackEntry ->
             JoinGroupScreen(
                 repository = repository,
                 prefs = prefs,
-                prefilledCode = (pendingNav as? PendingNav.JoinWithCode)?.code,
+                prefilledCode = backStackEntry.arguments?.getString("code"),
                 onBack = { navController.popBackStack() },
                 onJoined = { groupId ->
                     navController.navigate("lobby/$groupId") { popUpTo("home") }
