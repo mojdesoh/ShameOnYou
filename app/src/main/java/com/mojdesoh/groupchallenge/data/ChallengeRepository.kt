@@ -75,14 +75,18 @@ class ChallengeRepository {
         return group
     }
 
-    /** Returns null if no group has that code. */
+    /**
+     * Returns null if no group has that code. Joining works before the challenge locks and
+     * while it's ongoing (e.g. via the Details-screen QR code) — only once it's actually
+     * ended does a code/QR stop adding new members.
+     */
     suspend fun joinGroup(code: String, displayName: String): Group? {
         val uid = currentUserId()
         val normalizedCode = normalizeGroupCode(code)
         val snapshot = groupsRef().document(normalizedCode).get().await()
         if (!snapshot.exists()) return null
         val group = snapshot.toObject(Group::class.java) ?: return null
-        if (group.locked) return group
+        if (group.status() == GroupStatus.ENDED) return group
         val joinedAtMillis = System.currentTimeMillis()
         membersRef(normalizedCode).document(uid)
             .set(Member(uid, displayName, joinedAtMillis))
@@ -161,6 +165,16 @@ class ChallengeRepository {
         batch.delete(entriesRef(groupId).document(memberUserId))
         batch.delete(myGroupsRef(memberUserId).document(groupId))
         batch.set(removalNoticesRef(memberUserId).document(groupId), notice)
+        batch.commit().await()
+    }
+
+    /** A member leaving removes only their own data, so this needs no admin/cross-user rule. */
+    suspend fun leaveGroup(groupId: String) {
+        val uid = currentUserId()
+        val batch = db.batch()
+        batch.delete(membersRef(groupId).document(uid))
+        batch.delete(entriesRef(groupId).document(uid))
+        batch.delete(myGroupsRef(uid).document(groupId))
         batch.commit().await()
     }
 
