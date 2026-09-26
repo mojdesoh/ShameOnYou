@@ -46,7 +46,7 @@ fun JoinGroupScreen(
     onBack: () -> Unit,
     onJoined: (groupId: String) -> Unit
 ) {
-    var yourName by remember { mutableStateOf("") }
+    var yourName by remember { mutableStateOf(prefs.displayName ?: "") }
     var groupCode by remember { mutableStateOf(prefilledCode ?: "") }
     var isSubmitting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
