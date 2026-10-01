@@ -16,9 +16,11 @@ import com.mojdesoh.groupchallenge.data.status
 import com.mojdesoh.groupchallenge.ui.screens.ChallengeDetailsScreen
 import com.mojdesoh.groupchallenge.ui.screens.CreateChallengeScreen
 import com.mojdesoh.groupchallenge.ui.screens.CreateGroupScreen
+import com.mojdesoh.groupchallenge.ui.screens.DiscoverChallengesScreen
 import com.mojdesoh.groupchallenge.ui.screens.EditChallengeScreen
 import com.mojdesoh.groupchallenge.ui.screens.EntryScreen
 import com.mojdesoh.groupchallenge.ui.screens.HomeScreen
+import com.mojdesoh.groupchallenge.ui.screens.JoinChoiceScreen
 import com.mojdesoh.groupchallenge.ui.screens.JoinGroupScreen
 import com.mojdesoh.groupchallenge.ui.screens.LobbyScreen
 import com.mojdesoh.groupchallenge.ui.screens.ProgressScreen
@@ -55,7 +57,7 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
             HomeScreen(
                 repository = repository,
                 onCreateChallenge = { navController.navigate("createGroup") },
-                onJoinGroup = { navController.navigate("joinGroup") },
+                onJoinGroup = { navController.navigate("joinChoice") },
                 onOpenGroup = { group ->
                     val destination = when (group.status()) {
                         GroupStatus.NOT_LOCKED -> "lobby/${group.id}"
@@ -82,6 +84,20 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                 onCreated = { groupId ->
                     navController.navigate("lobby/$groupId") { popUpTo("home") }
                 }
+            )
+        }
+        composable("joinChoice") {
+            JoinChoiceScreen(
+                onBack = { navController.popBackStack() },
+                onEnterChallengeName = { navController.navigate("joinGroup") },
+                onDiscoverChallenges = { navController.navigate("discoverChallenges") }
+            )
+        }
+        composable("discoverChallenges") {
+            DiscoverChallengesScreen(
+                repository = repository,
+                onBack = { navController.popBackStack() },
+                onSelectChallenge = { code -> navController.navigate("joinGroup?code=$code") }
             )
         }
         composable(

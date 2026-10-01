@@ -54,13 +54,13 @@ fun CreateGroupScreen(
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             BackButton(onBack)
-            Text("Create a group", style = MaterialTheme.typography.headlineSmall)
+            Text("Create a challenge", style = MaterialTheme.typography.headlineSmall)
         }
 
         OutlinedTextField(
             value = groupName,
             onValueChange = { groupName = it },
-            label = { Text("Group name") },
+            label = { Text("Challenge name") },
             modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
         )
         OutlinedTextField(
@@ -75,7 +75,7 @@ fun CreateGroupScreen(
                 codeManuallyEdited = true
                 groupCode = it
             },
-            label = { Text("Group unique code") },
+            label = { Text("Challenge unique code") },
             supportingText = {
                 Text(
                     if (normalizedCode.isNotEmpty()) "People will use \"$normalizedCode\" to join"
@@ -92,7 +92,7 @@ fun CreateGroupScreen(
         Button(
             onClick = {
                 if (normalizedCode.isEmpty()) {
-                    error = "Enter a group code with at least one letter or number."
+                    error = "Enter a challenge code with at least one letter or number."
                     return@Button
                 }
                 error = null
@@ -103,9 +103,9 @@ fun CreateGroupScreen(
                         prefs.displayName = yourName.trim()
                         onCreated(group.id)
                     } catch (e: GroupCodeTakenException) {
-                        error = "That group code is already taken. Try a different one."
+                        error = "That challenge code is already taken. Try a different one."
                     } catch (t: Throwable) {
-                        error = "Couldn't create the group. Check your connection and try again."
+                        error = "Couldn't create the challenge. Check your connection and try again."
                     } finally {
                         isSubmitting = false
                     }

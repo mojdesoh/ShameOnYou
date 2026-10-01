@@ -120,6 +120,25 @@ class ChallengeRepository {
         awaitClose { registration.remove() }
     }
 
+    /**
+     * Every open or not-yet-started challenge in the whole app — not just the current user's
+     * own — newest first, for the "Discover existing challenges" browse list. Filters out
+     * ended and archived challenges, and ones the current user already belongs to, client-side
+     * (there's no stored "ended" field to query on; status is always computed from the current
+     * time, same as everywhere else in the app).
+     */
+    suspend fun discoverJoinableGroups(userId: String): List<Group> {
+        val myGroupIds = myGroupsRef(userId).get().await().documents.map { it.id }.toSet()
+        // Sorted client-side rather than via Firestore orderBy(): an orderBy on a field would
+        // silently drop any document missing that field, and this collection has accumulated
+        // data from well before some fields existed.
+        return groupsRef()
+            .get().await().documents
+            .mapNotNull { it.toObject(Group::class.java) }
+            .filter { !it.archived && it.status() != GroupStatus.ENDED && it.id !in myGroupIds }
+            .sortedByDescending { it.createdAtMillis }
+    }
+
     /** Admin-only: deletes a group and all its members/entries for everyone. */
     suspend fun deleteGroup(groupId: String) {
         val uid = currentUserId()
