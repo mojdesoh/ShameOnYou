@@ -79,7 +79,7 @@ fun JoinGroupScreen(
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             BackButton(onBack)
-            Text("Join a group", style = MaterialTheme.typography.headlineSmall)
+            Text("Enter the challenge name", style = MaterialTheme.typography.headlineSmall)
         }
 
         OutlinedButton(
@@ -113,7 +113,7 @@ fun JoinGroupScreen(
         OutlinedTextField(
             value = groupCode,
             onValueChange = { groupCode = it },
-            label = { Text("Group unique code") },
+            label = { Text("Challenge unique code") },
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
         )
@@ -130,7 +130,7 @@ fun JoinGroupScreen(
                     try {
                         val group = repository.joinGroup(groupCode.trim(), yourName.trim())
                         when {
-                            group == null -> error = "No group found for that code."
+                            group == null -> error = "No challenge found for that code."
                             group.status() == GroupStatus.ENDED ->
                                 error = "This challenge has already ended and isn't accepting new members."
                             else -> {
@@ -139,7 +139,7 @@ fun JoinGroupScreen(
                             }
                         }
                     } catch (t: Throwable) {
-                        error = "Couldn't join the group. Check your connection and try again."
+                        error = "Couldn't join the challenge. Check your connection and try again."
                     } finally {
                         isSubmitting = false
                     }

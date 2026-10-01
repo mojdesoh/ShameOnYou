@@ -96,7 +96,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Your challenges", style = MaterialTheme.typography.headlineSmall)
-                TextButton(onClick = onJoinGroup) { Text("Join a group") }
+                TextButton(onClick = onJoinGroup) { Text("Join a challenge") }
             }
 
             if (connectionError != null || (userId != null && visibleGroups.isEmpty())) {
