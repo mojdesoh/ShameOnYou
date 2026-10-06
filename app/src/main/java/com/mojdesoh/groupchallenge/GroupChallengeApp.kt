@@ -109,8 +109,8 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
                 prefs = prefs,
                 prefilledCode = backStackEntry.arguments?.getString("code"),
                 onBack = { navController.popBackStack() },
-                onJoined = { groupId ->
-                    navController.navigate("lobby/$groupId") { popUpTo("home") }
+                onRequested = {
+                    navController.navigate("home") { popUpTo("home") { inclusive = true } }
                 }
             )
         }
