@@ -40,8 +40,10 @@ import androidx.compose.ui.unit.dp
 import com.mojdesoh.groupchallenge.data.ChallengeRepository
 import com.mojdesoh.groupchallenge.data.Group
 import com.mojdesoh.groupchallenge.data.GroupStatus
+import com.mojdesoh.groupchallenge.data.JoinRequest
 import com.mojdesoh.groupchallenge.data.RemovalNotice
 import com.mojdesoh.groupchallenge.data.status
+import com.mojdesoh.groupchallenge.data.toDateTimeLabel
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
@@ -58,6 +60,7 @@ fun HomeScreen(
     var currentUserId by remember { mutableStateOf<String?>(null) }
     var connectionError by remember { mutableStateOf<String?>(null) }
     var removalNotices by remember { mutableStateOf<List<RemovalNotice>>(emptyList()) }
+    var myJoinRequests by remember { mutableStateOf<List<JoinRequest>>(emptyList()) }
     LaunchedEffect(Unit) {
         val uid = try {
             repository.currentUserId()
@@ -66,10 +69,15 @@ fun HomeScreen(
             return@LaunchedEffect
         }
         currentUserId = uid
-        // A failure here shouldn't block the rest of Home — removal notices are a nice-to-have,
-        // not required to see or manage your challenges.
+        // A failure here shouldn't block the rest of Home — removal notices and pending requests
+        // are a nice-to-have, not required to see or manage your challenges.
         removalNotices = try {
             repository.getRemovalNotices(uid)
+        } catch (t: Throwable) {
+            emptyList()
+        }
+        myJoinRequests = try {
+            repository.getMyJoinRequests(uid)
         } catch (t: Throwable) {
             emptyList()
         }
@@ -80,12 +88,28 @@ fun HomeScreen(
         .collectAsState(initial = emptyList())
     val visibleGroups = groups.filter { !it.archived }
 
+    // One-time fetch of pending join requests for every challenge the current user admins,
+    // refreshed whenever the admin's group list changes. Not live — a new request only shows up
+    // the next time Home loads or a group's membership changes — which is enough for this scope.
+    var pendingJoinRequests by remember { mutableStateOf<List<JoinRequest>>(emptyList()) }
+    LaunchedEffect(groups, userId) {
+        val uid = userId ?: return@LaunchedEffect
+        pendingJoinRequests = try {
+            groups.filter { it.adminId == uid }.flatMap { repository.getPendingJoinRequests(it.id) }
+        } catch (t: Throwable) {
+            emptyList()
+        }
+    }
+
     var pendingDelete by remember { mutableStateOf<Group?>(null) }
     var isDeleting by remember { mutableStateOf(false) }
     var pendingArchive by remember { mutableStateOf<Group?>(null) }
     var isArchiving by remember { mutableStateOf(false) }
     var pendingLeave by remember { mutableStateOf<Group?>(null) }
     var isLeaving by remember { mutableStateOf(false) }
+    var pendingCancelRequest by remember { mutableStateOf<JoinRequest?>(null) }
+    var isCancellingRequest by remember { mutableStateOf(false) }
+    var isHandlingJoinRequest by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
@@ -99,7 +123,9 @@ fun HomeScreen(
                 TextButton(onClick = onJoinGroup) { Text("Join a challenge") }
             }
 
-            if (connectionError != null || (userId != null && visibleGroups.isEmpty())) {
+            if (connectionError != null ||
+                (userId != null && visibleGroups.isEmpty() && myJoinRequests.isEmpty())
+            ) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.Center,
@@ -133,6 +159,12 @@ fun HomeScreen(
                             onDeleteOrLeave = {
                                 if (isAdmin) pendingDelete = group else pendingLeave = group
                             }
+                        )
+                    }
+                    items(myJoinRequests, key = { "request-${it.groupId}" }) { request ->
+                        RequestedChallengeCard(
+                            request = request,
+                            onCancel = { pendingCancelRequest = request }
                         )
                     }
                 }
@@ -244,6 +276,82 @@ fun HomeScreen(
             }
         )
     }
+
+    pendingCancelRequest?.let { request ->
+        AlertDialog(
+            onDismissRequest = { if (!isCancellingRequest) pendingCancelRequest = null },
+            title = { Text("Cancel your request to join \"${request.groupName}\"?") },
+            confirmButton = {
+                TextButton(
+                    enabled = !isCancellingRequest,
+                    onClick = {
+                        isCancellingRequest = true
+                        scope.launch {
+                            try {
+                                repository.removeJoinRequest(request.groupId, request.userId)
+                                myJoinRequests = myJoinRequests.filter { it.groupId != request.groupId }
+                            } finally {
+                                isCancellingRequest = false
+                                pendingCancelRequest = null
+                            }
+                        }
+                    }
+                ) { Text("Yes, cancel") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingCancelRequest = null }, enabled = !isCancellingRequest) { Text("No") }
+            }
+        )
+    }
+
+    pendingJoinRequests.firstOrNull()?.let { request ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Join request") },
+            text = {
+                Column {
+                    Text("${request.displayName} wants to join \"${request.groupName}\".")
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Requested ${request.requestedAtMillis.toDateTimeLabel()}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isHandlingJoinRequest,
+                    onClick = {
+                        isHandlingJoinRequest = true
+                        scope.launch {
+                            try {
+                                repository.confirmJoinRequest(request)
+                            } finally {
+                                pendingJoinRequests = pendingJoinRequests.drop(1)
+                                isHandlingJoinRequest = false
+                            }
+                        }
+                    }
+                ) { Text("Confirm") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !isHandlingJoinRequest,
+                    onClick = {
+                        isHandlingJoinRequest = true
+                        scope.launch {
+                            try {
+                                repository.removeJoinRequest(request.groupId, request.userId)
+                            } finally {
+                                pendingJoinRequests = pendingJoinRequests.drop(1)
+                                isHandlingJoinRequest = false
+                            }
+                        }
+                    }
+                ) { Text("Reject") }
+            }
+        )
+    }
 }
 
 @Composable
@@ -262,7 +370,10 @@ private fun ChallengeCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(group.name, style = MaterialTheme.typography.titleMedium)
-                Text(statusLabel(group), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "${statusLabel(group)} · ${if (isAdmin) "Admin" else "Member"}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
             IconButton(onClick = onEdit, enabled = isAdmin && group.status() != GroupStatus.ENDED) {
                 Icon(Icons.Default.Edit, contentDescription = "Edit")
@@ -272,6 +383,24 @@ private fun ChallengeCard(
             }
             IconButton(onClick = onDeleteOrLeave) {
                 Icon(Icons.Default.Delete, contentDescription = if (isAdmin) "Delete" else "Leave")
+            }
+        }
+    }
+}
+
+@Composable
+private fun RequestedChallengeCard(request: JoinRequest, onCancel: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(request.groupName, style = MaterialTheme.typography.titleMedium)
+                Text("Requested", style = MaterialTheme.typography.bodyMedium)
+            }
+            IconButton(onClick = onCancel) {
+                Icon(Icons.Default.Delete, contentDescription = "Cancel request")
             }
         }
     }
