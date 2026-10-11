@@ -44,7 +44,7 @@ fun JoinGroupScreen(
     prefs: LocalPrefs,
     prefilledCode: String?,
     onBack: () -> Unit,
-    onJoined: (groupId: String) -> Unit
+    onRequested: () -> Unit
 ) {
     var yourName by remember { mutableStateOf(prefs.displayName ?: "") }
     var groupCode by remember { mutableStateOf(prefilledCode ?: "") }
@@ -128,18 +128,18 @@ fun JoinGroupScreen(
                 isSubmitting = true
                 scope.launch {
                     try {
-                        val group = repository.joinGroup(groupCode.trim(), yourName.trim())
+                        val group = repository.requestToJoin(groupCode.trim(), yourName.trim())
                         when {
                             group == null -> error = "No challenge found for that code."
                             group.status() == GroupStatus.ENDED ->
                                 error = "This challenge has already ended and isn't accepting new members."
                             else -> {
                                 prefs.displayName = yourName.trim()
-                                onJoined(group.id)
+                                onRequested()
                             }
                         }
                     } catch (t: Throwable) {
-                        error = "Couldn't join the challenge. Check your connection and try again."
+                        error = "Couldn't send the request. Check your connection and try again."
                     } finally {
                         isSubmitting = false
                     }
@@ -151,7 +151,7 @@ fun JoinGroupScreen(
             if (isSubmitting) {
                 CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
             }
-            Text("Join")
+            Text("Request to join")
         }
     }
 
@@ -184,7 +184,7 @@ fun JoinGroupScreen(
                     TextButton(onClick = {
                         groupCode = g.inviteCode
                         scannedGroup = null
-                    }) { Text("Join this challenge") }
+                    }) { Text("Use this challenge") }
                 } else {
                     TextButton(onClick = { scannedGroup = null }) { Text("OK") }
                 }

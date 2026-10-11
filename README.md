@@ -44,15 +44,17 @@ file stays local to your machine — you won't need to redo this after a `git pu
 ### Firestore security rules
 
 The default "production mode" rules deny all reads/writes. For this app's data model
-(collection `groups`, with subcollections `members` and `entries`, plus a top-level `users`
-collection that indexes which groups each user belongs to and holds each user's pending
-removal notices — see "Home screen and multiple challenges" below), a starting point that
-matches what the client actually needs — anyone signed in can read a group and its
-subcollections, only the admin can lock it, rename it, archive it, set the challenge, or
-delete it (which also lets the admin delete other members' member/entry docs, drop a removed
-member's own membership-index entry, and leave that member a removal notice), each member
-can otherwise only write their own member/entry doc, and each user can only read/write their
-own membership index and their own removal notices:
+(collection `groups`, with subcollections `members`, `entries`, and `joinRequests`, plus a
+top-level `users` collection that indexes which groups each user belongs to and holds each
+user's pending removal notices and their own outstanding join requests — see "Home screen
+and multiple challenges" below), a starting point that matches what the client actually
+needs — anyone signed in can read a group and its subcollections, only the admin can lock
+it, rename it, archive it, set the challenge, or delete it (which also lets the admin delete
+other members' member/entry docs, drop a removed member's own membership-index entry, and
+leave that member a removal notice), each member can otherwise only write their own
+member/entry doc, each user can only read/write their own membership index, removal notices,
+and join requests, and the admin can additionally write a *requester's* membership index and
+join-request docs (needed to confirm or reject a join request — see "Join requests" below):
 
 ```
 rules_version = '2';
@@ -75,12 +77,22 @@ service cloud.firestore {
         allow delete: if request.auth != null &&
           get(/databases/$(database)/documents/groups/$(groupId)).data.adminId == request.auth.uid;
       }
+      match /joinRequests/{userId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && (
+          request.auth.uid == userId ||
+          get(/databases/$(database)/documents/groups/$(groupId)).data.adminId == request.auth.uid
+        );
+      }
     }
 
     match /users/{userId}/groups/{groupId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null &&
-        get(/databases/$(database)/documents/groups/$(groupId)).data.adminId == request.auth.uid;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && (
+        request.auth.uid == userId ||
+        get(/databases/$(database)/documents/groups/$(groupId)).data.adminId == request.auth.uid
+      );
     }
 
     match /users/{userId}/removalNotices/{groupId} {
@@ -88,9 +100,25 @@ service cloud.firestore {
       allow create: if request.auth != null &&
         get(/databases/$(database)/documents/groups/$(groupId)).data.adminId == request.auth.uid;
     }
+
+    match /users/{userId}/joinRequests/{groupId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && (
+        request.auth.uid == userId ||
+        get(/databases/$(database)/documents/groups/$(groupId)).data.adminId == request.auth.uid
+      );
+    }
   }
 }
 ```
+
+**If you already pasted the previous version of these rules into the Firebase console,
+you need to update them again** — this version adds the `joinRequests` rules and widens the
+`users/{userId}/groups/{groupId}` rule from "admin can only delete" to "admin can write"
+(the new confirm-join-request flow needs the admin to create a membership-index entry for
+someone else, not just delete one). Firebase console → Firestore Database → Rules tab →
+replace the contents → Publish.
 
 ## Running it
 
@@ -135,15 +163,36 @@ Home screen just reads that index for the signed-in user and fetches each refere
     filtered out of the Home list (still in Firestore, just not shown — no dedicated
     archived-challenges view yet) and their reminders are cancelled.
 
+## Join requests
+
+Joining a challenge isn't immediate — entering a code or scanning a QR creates a pending
+[`JoinRequest`](#firestore-security-rules), not a membership. It's stored both under the
+group (`groups/{groupId}/joinRequests/{userId}`, for the admin's review) and under the
+requester (`users/{userId}/joinRequests/{groupId}`, same reverse-index pattern as
+`users/{uid}/groups`, so the requester's own Home screen can show it without a
+collection-group query).
+
+- **Admin side:** Home fetches every pending request across the challenges the signed-in
+  user admins and shows them one at a time as a dialog — requester's name, challenge name,
+  and requested date/time — with Confirm/Reject. Confirm creates the real member doc and
+  the requester's membership-index entry, then clears the request from both sides; Reject
+  just clears it. This fetch isn't a live listener, so a brand-new request shows up the next
+  time Home loads or the admin's group list changes, not instantly.
+- **Requester side:** until confirmed, the challenge shows on the requester's Home screen as
+  a "Requested" card (name + status only, no Edit/Archive — there's nothing to manage yet)
+  with a Cancel-request action. Once the admin confirms, it becomes a normal challenge card
+  with "Member" as the status. The Details screen also shows "My status" as Admin or Member
+  for anyone who's actually gotten in.
+
 ## Known v1 limitations
 
 - **Reminder timing isn't exact.** `WorkManager` periodic scheduling can drift by a while
   under Doze/battery optimization — fine for a weekly nudge, but worth revisiting with
   exact alarms if tighter timing ever matters.
-- **No admin confirmation step for new members yet** — anyone with the group code joins
-  immediately. The product spec calls for the group creator to be notified when someone
-  joins (and, later, to approve them) — that notification isn't built yet, only the plain
-  join flow.
+- **Join request notifications are in-app only, not push.** The admin sees pending requests
+  the next time they open the app (or whenever their Home screen's group list refreshes) —
+  not an instant push notification the moment someone requests to join. See "Join requests"
+  below.
 - **The "Your name" field on Create/Join is temporary.** Once the app has a profile
   screen, display names should come from there instead of being typed in on every group.
 - **A member can log progress more than once between reminders** — there's no enforcement

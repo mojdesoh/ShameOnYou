@@ -37,6 +37,14 @@ class ChallengeRepository {
     private fun removalNoticesRef(userId: String) =
         db.collection("users").document(userId).collection("removalNotices")
 
+    /** Pending requests to join this group, awaiting the admin's confirm/reject. */
+    private fun joinRequestsRef(groupId: String) = groupsRef().document(groupId).collection("joinRequests")
+
+    /** Mirror of a user's own pending requests, so their Home screen can show them without a
+     * collection-group query — same pattern as [myGroupsRef]. */
+    private fun myJoinRequestsRef(userId: String) =
+        db.collection("users").document(userId).collection("joinRequests")
+
     suspend fun currentUserId(): String {
         auth.currentUser?.let { return it.uid }
         val result = auth.signInAnonymously().await()
@@ -76,25 +84,63 @@ class ChallengeRepository {
     }
 
     /**
-     * Returns null if no group has that code. Joining works before the challenge locks and
-     * while it's ongoing (e.g. via the Details-screen QR code) — only once it's actually
-     * ended does a code/QR stop adding new members.
+     * Returns null if no group has that code. Requesting works before the challenge locks and
+     * while it's ongoing (e.g. via the Details-screen QR code) — only once it's actually ended
+     * does a code/QR stop accepting requests. Joining isn't immediate: this creates a pending
+     * [JoinRequest] that the admin must confirm (see [confirmJoinRequest]) before the requester
+     * becomes a member.
      */
-    suspend fun joinGroup(code: String, displayName: String): Group? {
+    suspend fun requestToJoin(code: String, displayName: String): Group? {
         val uid = currentUserId()
         val normalizedCode = normalizeGroupCode(code)
         val snapshot = groupsRef().document(normalizedCode).get().await()
         if (!snapshot.exists()) return null
         val group = snapshot.toObject(Group::class.java) ?: return null
         if (group.status() == GroupStatus.ENDED) return group
-        val joinedAtMillis = System.currentTimeMillis()
-        membersRef(normalizedCode).document(uid)
-            .set(Member(uid, displayName, joinedAtMillis))
-            .await()
-        myGroupsRef(uid).document(normalizedCode)
-            .set(mapOf("joinedAtMillis" to joinedAtMillis))
-            .await()
+        val request = JoinRequest(
+            groupId = normalizedCode,
+            groupName = group.name,
+            userId = uid,
+            displayName = displayName,
+            requestedAtMillis = System.currentTimeMillis()
+        )
+        val batch = db.batch()
+        batch.set(joinRequestsRef(normalizedCode).document(uid), request)
+        batch.set(myJoinRequestsRef(uid).document(normalizedCode), request)
+        batch.commit().await()
         return group
+    }
+
+    /** Every pending request to join this group — for the admin's review. */
+    suspend fun getPendingJoinRequests(groupId: String): List<JoinRequest> =
+        joinRequestsRef(groupId).get().await().documents.mapNotNull { it.toObject(JoinRequest::class.java) }
+
+    /** Every challenge the current user has an outstanding request for, so Home can show it
+     * alongside their confirmed memberships with a "Requested" status. */
+    suspend fun getMyJoinRequests(userId: String): List<JoinRequest> =
+        myJoinRequestsRef(userId).get().await().documents.mapNotNull { it.toObject(JoinRequest::class.java) }
+
+    /**
+     * Admin-only: accepts [request], turning it into real membership — creates the member doc
+     * and the requester's own membership index entry (a cross-user write, hence the admin-write
+     * rule on `users/{uid}/groups`), then clears the request from both sides.
+     */
+    suspend fun confirmJoinRequest(request: JoinRequest) {
+        val joinedAtMillis = System.currentTimeMillis()
+        val batch = db.batch()
+        batch.set(membersRef(request.groupId).document(request.userId), Member(request.userId, request.displayName, joinedAtMillis))
+        batch.set(myGroupsRef(request.userId).document(request.groupId), mapOf("joinedAtMillis" to joinedAtMillis))
+        batch.delete(joinRequestsRef(request.groupId).document(request.userId))
+        batch.delete(myJoinRequestsRef(request.userId).document(request.groupId))
+        batch.commit().await()
+    }
+
+    /** Admin-only reject, or the requester cancelling their own pending request — same effect. */
+    suspend fun removeJoinRequest(groupId: String, userId: String) {
+        val batch = db.batch()
+        batch.delete(joinRequestsRef(groupId).document(userId))
+        batch.delete(myJoinRequestsRef(userId).document(groupId))
+        batch.commit().await()
     }
 
     /**

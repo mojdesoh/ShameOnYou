@@ -83,6 +83,7 @@ fun ChallengeDetailsScreen(
         DetailRow("Start date", challenge.startAtMillis.toDateLabel())
         DetailRow("End date", challenge.endAtMillis.toDateLabel())
         DetailRow("Status", statusLabel)
+        DetailRow("My status", if (isAdmin) "Admin" else "Member")
 
         Spacer(Modifier.height(24.dp))
         Text("Members (${members.size})", style = MaterialTheme.typography.titleMedium)

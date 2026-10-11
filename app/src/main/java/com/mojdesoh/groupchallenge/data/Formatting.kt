@@ -9,6 +9,9 @@ enum class GroupStatus { NOT_LOCKED, ACTIVE, ENDED }
 fun Long.toDateLabel(): String =
     SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(this))
 
+fun Long.toDateTimeLabel(): String =
+    SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault()).format(Date(this))
+
 /** Where a group is in its lifecycle, used both for the Home screen label and for routing. */
 fun Group.status(): GroupStatus {
     if (!locked) return GroupStatus.NOT_LOCKED

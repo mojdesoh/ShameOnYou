@@ -55,3 +55,16 @@ data class RemovalNotice(
     val removedByName: String = "",
     val removedAtMillis: Long = 0L
 )
+
+/**
+ * A pending request to join a challenge. Joining now requires the admin to confirm a request
+ * rather than adding the requester as a member immediately — see
+ * ChallengeRepository.requestToJoin/confirmJoinRequest/rejectJoinRequest.
+ */
+data class JoinRequest(
+    val groupId: String = "",
+    val groupName: String = "",
+    val userId: String = "",
+    val displayName: String = "",
+    val requestedAtMillis: Long = 0L
+)
