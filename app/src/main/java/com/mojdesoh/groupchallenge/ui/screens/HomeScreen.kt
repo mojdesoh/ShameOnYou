@@ -135,12 +135,7 @@ fun HomeScreen(
                     connectionError?.let {
                         Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                     } ?: run {
-                        Text("No challenges yet", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Start a group, invite people, set a goal, and hold each other to it.",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Text("Create your own challenge or join one.", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(24.dp))
                         Button(onClick = onJoinGroup) { Text("Join a challenge") }
                     }
