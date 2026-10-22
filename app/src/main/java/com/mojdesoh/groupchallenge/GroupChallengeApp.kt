@@ -30,7 +30,6 @@ import com.mojdesoh.groupchallenge.data.status
 import com.mojdesoh.groupchallenge.ui.screens.ChallengeDetailsScreen
 import com.mojdesoh.groupchallenge.ui.screens.CreateChallengeScreen
 import com.mojdesoh.groupchallenge.ui.screens.CreateGroupScreen
-import com.mojdesoh.groupchallenge.ui.screens.DiscoverChallengesScreen
 import com.mojdesoh.groupchallenge.ui.screens.EditChallengeScreen
 import com.mojdesoh.groupchallenge.ui.screens.EntryScreen
 import com.mojdesoh.groupchallenge.ui.screens.HomeScreen
@@ -111,15 +110,9 @@ fun GroupChallengeApp(prefs: LocalPrefs, pendingNav: PendingNav?, onPendingNavCo
             }
             composable("joinChoice") {
                 JoinChoiceScreen(
-                    onBack = { navController.popBackStack() },
-                    onEnterChallengeName = { navController.navigate("joinGroup") },
-                    onDiscoverChallenges = { navController.navigate("discoverChallenges") }
-                )
-            }
-            composable("discoverChallenges") {
-                DiscoverChallengesScreen(
                     repository = repository,
                     onBack = { navController.popBackStack() },
+                    onEnterChallengeName = { navController.navigate("joinGroup") },
                     onSelectChallenge = { code -> navController.navigate("joinGroup?code=$code") }
                 )
             }
