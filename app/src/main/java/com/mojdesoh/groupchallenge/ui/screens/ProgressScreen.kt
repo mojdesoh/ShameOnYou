@@ -121,5 +121,8 @@ fun ProgressScreen(
                 Text("Log progress")
             }
         }
+
+        // Clears the global create-challenge FAB, which floats over the bottom-right corner.
+        Spacer(Modifier.height(64.dp))
     }
 }

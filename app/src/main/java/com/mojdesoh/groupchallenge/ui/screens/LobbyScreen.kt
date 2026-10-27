@@ -11,16 +11,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import android.content.Intent
 import com.mojdesoh.groupchallenge.data.ChallengeRepository
 import com.mojdesoh.groupchallenge.data.LocalPrefs
+import kotlinx.coroutines.launch
 
 @Composable
 fun LobbyScreen(
@@ -58,10 +67,29 @@ fun LobbyScreen(
 
     val isAdmin = group?.adminId != null && group?.adminId == currentUserId
 
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf("") }
+    var isRenaming by remember { mutableStateOf(false) }
+    var renameError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             BackButton(onBack)
-            Text(group?.name ?: "Loading…", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                group?.name ?: "Loading…",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.weight(1f)
+            )
+            if (isAdmin && group != null) {
+                IconButton(onClick = {
+                    renameText = group?.name.orEmpty()
+                    renameError = null
+                    showRenameDialog = true
+                }) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit challenge name")
+                }
+            }
         }
 
         group?.let { g ->
@@ -113,5 +141,54 @@ fun LobbyScreen(
                 style = MaterialTheme.typography.bodyMedium
             )
         }
+
+        // Clears the global create-challenge FAB, which floats over the bottom-right corner.
+        Spacer(Modifier.height(64.dp))
+    }
+
+    if (showRenameDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isRenaming) showRenameDialog = false },
+            title = { Text("Rename challenge") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = renameText,
+                        onValueChange = { renameText = it },
+                        label = { Text("Challenge name") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    renameError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isRenaming,
+                    onClick = {
+                        val trimmed = renameText.trim()
+                        if (trimmed.isEmpty()) {
+                            renameError = "Enter a challenge name."
+                            return@TextButton
+                        }
+                        isRenaming = true
+                        scope.launch {
+                            try {
+                                repository.updateGroupName(groupId, trimmed)
+                                showRenameDialog = false
+                            } catch (t: Throwable) {
+                                renameError = "Couldn't save. Check your connection and try again."
+                            } finally {
+                                isRenaming = false
+                            }
+                        }
+                    }
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }, enabled = !isRenaming) { Text("Cancel") }
+            }
+        )
     }
 }
