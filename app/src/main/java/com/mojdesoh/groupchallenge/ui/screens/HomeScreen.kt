@@ -21,11 +21,16 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -364,16 +369,39 @@ private fun ChallengeCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            IconButton(onClick = onEdit, enabled = isAdmin && group.status() != GroupStatus.ENDED) {
+            TooltipIconButton(
+                tooltipText = "Edit",
+                onClick = onEdit,
+                enabled = isAdmin && group.status() != GroupStatus.ENDED
+            ) {
                 Icon(Icons.Default.Edit, contentDescription = "Edit")
             }
-            IconButton(onClick = onArchive, enabled = isAdmin) {
+            TooltipIconButton(tooltipText = "Archive", onClick = onArchive, enabled = isAdmin) {
                 Icon(Icons.Default.Archive, contentDescription = "Archive")
             }
-            IconButton(onClick = onDeleteOrLeave) {
-                Icon(Icons.Default.Delete, contentDescription = if (isAdmin) "Delete" else "Leave")
+            val deleteOrLeaveLabel = if (isAdmin) "Delete" else "Leave"
+            TooltipIconButton(tooltipText = deleteOrLeaveLabel, onClick = onDeleteOrLeave) {
+                Icon(Icons.Default.Delete, contentDescription = deleteOrLeaveLabel)
             }
         }
+    }
+}
+
+/** An IconButton that shows [tooltipText] on long-press (touch) or hover (mouse/stylus). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TooltipIconButton(
+    tooltipText: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    icon: @Composable () -> Unit
+) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(tooltipText) } },
+        state = rememberTooltipState()
+    ) {
+        IconButton(onClick = onClick, enabled = enabled, content = icon)
     }
 }
 
