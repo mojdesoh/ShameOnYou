@@ -38,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import android.content.Intent
 import com.mojdesoh.groupchallenge.data.ChallengeRepository
 import com.mojdesoh.groupchallenge.data.LocalPrefs
+import com.mojdesoh.groupchallenge.data.toDateTimeLabel
 import kotlinx.coroutines.launch
 
 @Composable
@@ -93,6 +94,11 @@ fun LobbyScreen(
         }
 
         group?.let { g ->
+            Spacer(Modifier.height(16.dp))
+            DetailRow("Created", g.createdAtMillis.toDateTimeLabel())
+            DetailRow("Status", "Waiting to start")
+            DetailRow("Starting date", "Not set yet")
+
             Spacer(Modifier.height(16.dp))
             Text("Group code: ${g.inviteCode}", style = MaterialTheme.typography.titleMedium)
             OutlinedButton(
@@ -190,5 +196,16 @@ fun LobbyScreen(
                 TextButton(onClick = { showRenameDialog = false }, enabled = !isRenaming) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }
