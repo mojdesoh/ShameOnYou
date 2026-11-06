@@ -56,7 +56,14 @@ class ChallengeRepository {
      * atomically check-and-claim it — two people racing to create the same code can't both
      * succeed.
      */
-    suspend fun createGroup(name: String, adminDisplayName: String, code: String): Group {
+    suspend fun createGroup(
+        name: String,
+        adminDisplayName: String,
+        code: String,
+        draftGoalTitle: String = "",
+        draftGoalTarget: Double? = null,
+        draftGoalUnit: String = ""
+    ): Group {
         val uid = currentUserId()
         val normalizedCode = normalizeGroupCode(code)
         val docRef = groupsRef().document(normalizedCode)
@@ -68,7 +75,10 @@ class ChallengeRepository {
             adminDisplayName = adminDisplayName,
             locked = false,
             createdAtMillis = System.currentTimeMillis(),
-            adminTimeZoneId = TimeZone.getDefault().id
+            adminTimeZoneId = TimeZone.getDefault().id,
+            draftGoalTitle = draftGoalTitle,
+            draftGoalTarget = draftGoalTarget,
+            draftGoalUnit = draftGoalUnit
         )
         db.runTransaction { transaction ->
             if (transaction.get(docRef).exists()) throw GroupCodeTakenException()
