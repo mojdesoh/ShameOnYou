@@ -19,6 +19,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +34,7 @@ import com.mojdesoh.groupchallenge.data.Challenge
 import com.mojdesoh.groupchallenge.data.ChallengeRepository
 import com.mojdesoh.groupchallenge.data.GoalType
 import com.mojdesoh.groupchallenge.data.ScopeUnit
+import com.mojdesoh.groupchallenge.data.formatNumber
 import com.mojdesoh.groupchallenge.work.ReminderScheduler
 import kotlinx.coroutines.launch
 
@@ -56,6 +58,20 @@ fun CreateChallengeScreen(
     var unit by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var draftLoaded by remember { mutableStateOf(false) }
+
+    // Prefill from whatever goal info was jotted down at creation time — once, so it doesn't
+    // clobber what the admin is typing here if the group doc refreshes mid-edit.
+    LaunchedEffect(Unit) {
+        if (draftLoaded) return@LaunchedEffect
+        val draft = repository.getGroupOnce(groupId)
+        if (draft != null) {
+            if (title.isBlank()) title = draft.draftGoalTitle
+            if (goalNumber.isBlank()) goalNumber = draft.draftGoalTarget?.let { formatNumber(it) } ?: ""
+            if (unit.isBlank()) unit = draft.draftGoalUnit
+        }
+        draftLoaded = true
+    }
 
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {

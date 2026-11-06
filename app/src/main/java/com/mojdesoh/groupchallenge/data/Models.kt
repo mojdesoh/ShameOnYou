@@ -29,7 +29,13 @@ data class Group(
     val createdAtMillis: Long = 0L,
     val adminTimeZoneId: String = "",
     val challenge: Challenge? = null,
-    val archived: Boolean = false
+    val archived: Boolean = false,
+    // Optional goal info the admin can jot down before locking the group — none of it is
+    // required to create a challenge, but all three are required to lock it (see
+    // CreateChallengeScreen), which is where they become the real Challenge.title/goalNumber/unit.
+    val draftGoalTitle: String = "",
+    val draftGoalTarget: Double? = null,
+    val draftGoalUnit: String = ""
 )
 
 data class Member(
