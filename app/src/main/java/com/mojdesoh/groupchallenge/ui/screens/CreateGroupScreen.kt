@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -22,7 +21,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import com.mojdesoh.groupchallenge.data.ChallengeRepository
 import com.mojdesoh.groupchallenge.data.GroupCodeTakenException
@@ -47,6 +46,7 @@ fun CreateGroupScreen(
     var isSubmitting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     // Follows the group name until the user edits the code field themselves.
     LaunchedEffect(groupName, codeManuallyEdited) {
@@ -67,13 +67,13 @@ fun CreateGroupScreen(
             value = groupName,
             onValueChange = { groupName = it },
             label = { Text("Challenge name") },
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 24.dp).showKeyboardOnFocus(keyboardController)
         )
         OutlinedTextField(
             value = yourName,
             onValueChange = { yourName = it },
             label = { Text("Your name") },
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp).showKeyboardOnFocus(keyboardController)
         )
         OutlinedTextField(
             value = groupCode,
@@ -88,7 +88,7 @@ fun CreateGroupScreen(
                     else "Letters, numbers, and hyphens only"
                 )
             },
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp).showKeyboardOnFocus(keyboardController)
         )
 
         Text(
@@ -101,15 +101,14 @@ fun CreateGroupScreen(
             onValueChange = { goal = it },
             label = { Text("Goal") },
             placeholder = { Text("e.g. Losing weight") },
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp).showKeyboardOnFocus(keyboardController)
         )
         Row(modifier = Modifier.padding(top = 12.dp)) {
             OutlinedTextField(
                 value = target,
                 onValueChange = { target = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Target") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).showKeyboardOnFocus(keyboardController)
             )
             Spacer(Modifier.padding(start = 8.dp))
             OutlinedTextField(
@@ -117,7 +116,7 @@ fun CreateGroupScreen(
                 onValueChange = { unit = it },
                 label = { Text("Unit") },
                 placeholder = { Text("e.g. kg") },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).showKeyboardOnFocus(keyboardController)
             )
         }
 

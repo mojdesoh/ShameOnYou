@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -27,8 +26,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.mojdesoh.groupchallenge.data.Challenge
 import com.mojdesoh.groupchallenge.data.ChallengeRepository
@@ -48,6 +47,7 @@ fun CreateChallengeScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     var title by remember { mutableStateOf("") }
     var goalType by remember { mutableStateOf(GoalType.MIN) }
@@ -84,7 +84,7 @@ fun CreateChallengeScreen(
             onValueChange = { title = it },
             label = { Text("Title") },
             placeholder = { Text("e.g. Losing weight") },
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 24.dp).showKeyboardOnFocus(keyboardController)
         )
 
         Text("Goal type", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 16.dp))
@@ -108,8 +108,7 @@ fun CreateChallengeScreen(
                 value = scopeValue,
                 onValueChange = { scopeValue = it.filter { c -> c.isDigit() } },
                 label = { Text("Number") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).showKeyboardOnFocus(keyboardController)
             )
             Spacer(Modifier.padding(start = 8.dp))
             Box(modifier = Modifier.weight(1f)) {
@@ -141,8 +140,7 @@ fun CreateChallengeScreen(
                 value = goalNumber,
                 onValueChange = { goalNumber = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Number") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).showKeyboardOnFocus(keyboardController)
             )
             Spacer(Modifier.padding(start = 8.dp))
             OutlinedTextField(
@@ -150,7 +148,7 @@ fun CreateChallengeScreen(
                 onValueChange = { unit = it },
                 label = { Text("Unit") },
                 placeholder = { Text("e.g. kg") },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).showKeyboardOnFocus(keyboardController)
             )
         }
 
